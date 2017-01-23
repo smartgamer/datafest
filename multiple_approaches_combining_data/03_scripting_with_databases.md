@@ -2,34 +2,37 @@
 layout: default
 title: "Querying the Database within R, Python, & Stata"
 author: "Radhika Khetani, Bob Freeman"
-output: html_document
 teaching: 20 minutes
 exercies: 10 minutes
-questions:
-- "How can I access databases from scripts and programs written in Python, R, Stata, or other languages?"
-objectives:
-- "Write short programs that execute SQL queries."
-- "Trace the execution of a program that contains an SQL query."
-keypoints:
-- "General-purpose languages have libraries for accessing databases."
-- "To connect to a database, a program must use a library specific to that database manager."
-- "These libraries use a connection-and-cursor model."
-what we won't cover:
-- "Programs can read query results in batches or all at once."
-- "Queries should be written using parameter substitution, not string formatting."
 ---
+
+> questions:
+> - "How can I access databases from scripts and programs written in Python, R, Stata, or other languages?"
+> objectives:
+> - "Write short programs that execute SQL queries."
+> keypoints:
+> - "General-purpose languages have libraries for accessing databases."
+> - "To connect to a database, a program must use a library specific to that database manager."
+> - "These libraries use a connection-and-cursor model."
+> what we won't cover:
+> - "Programs can read query results in batches or all at once."
+> - "Queries should be written using parameter substitution, not string formatting."
+
 
 ## Moving to R (dplyr), Python, and Stata for accessing local/remote DB
 
 One real value in using databases is that this data is accessible from multiple analysis and visualization environments, like R, Python, Stata, and Tableau. The real win is that these environments request the data, and all the heavy computation is done on the back end. This allow greater amount of flexibility in scripting, the data is managed uniformly, and the processing is offloaded to the database backend (SQLite). Let's look at one example:
 
-??Briefly discuss ODBC & how to configure
-??Direct access from R/Python using local shared libraries/language bindings
+The best way to connect to a database (remote or local) is through the native driver (connector) that comes with the database program itself. With this driver, your program in any common language can natively connect directly to the database. Each database program will require its own custom driver.
+
+![Connector  Concepts](https://github.com/IQSS/datafest/blob/master/multiple_approaches_combining_data/images/connectors2.jpg "Conceptual Overview of Database Connector")
+*Image from [Uniface Info](http://unifaceinfo.com/docs/0907/Uniface_Library_HTML/ulibrary/UnifaceDatabaseConnectors_0B1A074C362F5F0369E54E0046832324.html)*
+
+A more modular, generic approach is using ODBC (Open Database Connectivity). This approach uses a database manager as a broker to hide database-specific commands, so that your program can use generic SQL-querying language. All that is needed is a specific driver to sit between the ODBC manage and the database.
 
 ![ODBC Concepts](https://github.com/IQSS/datafest/blob/master/multiple_approaches_combining_data/images/udapcategoryodbc.png "Conceptual Overview of ODBC")
 *Image from [OpenLink Software](https://uda.openlinksw.com/odbc/)*
 
-TODO: general outline or figure on how languages access databases. This should show direct access via connectors; and also via ODBC Manager and Drivers
 
 ### Accessing our data: A pseudocode example
 
@@ -129,20 +132,13 @@ dbDisconnect(connection)
 library('RSQLite')
 library('dplyr')
 
-# open the database connection
-connection <- dbConnect(SQLite(), "survey.db")
+my_db <- src_sqlite("survey.db")
 
-***
 # execute and fetch the results
-results <- dbGetQuery(connection, "SELECT Site.lat, Site.long FROM Site;")
-***
+results <- tbl(my_db, sql("SELECT Site.lat, Site.long FROM Site"))
 
 # print 'em out
 print(results)
-
-# close the connection
-dbDisconnect(connection)
-
 ```
 
 **Python**
@@ -181,12 +177,32 @@ with one element for each field we asked for. We finally close our cursor and ou
 **Stata**
 
 ```stata
-???
+set more off
+odbc load lat=lat lon=long, exec(`"SELECT Site.lat, Site.long FROM Site;"') dsn("DF_Survey_DB") clear  
+list
 ```
+
+**Brief notes:** Stata does not need the open connect and cursor calls that the other languages do, so the code is even more compact. Unfortunately, Stata can only use one table at a time. Thus executing calls where the joins are done outside of Stata is even more important!
+
+### Database Safety
+
+So, the queries that we have done were simple and static. Once can do dynamic queries by including a wildcard in your query statement:
+
+```python
+query = "SELECT personal || ' ' || family FROM Person WHERE id=?;"
+person = 'dyer'
+cursor.execute(query, person)
+```
+
+The `?` wildcard allows you to substitue in a value at the time of the query execution. This means that you can dynamically set the value of a variable (or some other method) in order to make your script flexible and more abstract.
+
 
 ## Exercises:
 > 
 > We've shown how to execute the SQL code for a one table query in pseudocode. Modify your code and query for a two table join? 
 > 
-> ??Show approach at doing join inside R, Python, Stata
 > 
+
+***
+
+*Materials used in these lessons are derived predominantly from Software Carpentry's Databases and SQL lessons, which have been released under the Creative Commons Attribution license (CC BY 4.0). Small portions were also derived from Data Carpentry's SQL for Ecology lessons, which have been released under the Creative Commons Attribution license (CC BY 4.0).*
